@@ -154,6 +154,9 @@
     "rdpHint": "Escritorio remoto de Windows (también xrdp). Usa DOMINIO\\usuario para cuentas de dominio. En Mac, ⌘ funciona como Ctrl en la sesión.",
     "sharedFolder": "Carpeta compartida",
     "sharedFolderHint": "Aparece en el equipo remoto como la unidad «Hostealo» (Este equipo), para copiar archivos en los dos sentidos. Déjala vacía para no compartir nada.",
+    "commandsHost": "Comandos del agente IA por SSH",
+    "commandsHostNone": "Ninguno (solo ratón y teclado)",
+    "commandsHostHint": "Un servidor SSH guardado para este mismo equipo: el agente IA ejecuta ahí sus comandos y lee su salida, más rápido y fiable que hacer clic. Windows Server 2019 y posteriores incluyen OpenSSH; para activarlo, ejecuta esto en un PowerShell de administrador en el servidor:",
     "sharedFolderNone": "Sin carpeta compartida",
     "showSecret": "Mostrar",
     "hideSecret": "Ocultar",
@@ -366,6 +369,9 @@
     "noOutputHint": "Esta pestaña no es una terminal",
     "contextOutput": "Con la salida de {{name}}",
     "contextSession": "Con los datos de la sesión {{name}}",
+    "includeScreen": "Pantalla de {{name}}",
+    "includeScreenHint": "Envía una captura del escritorio remoto con tu pregunta",
+    "contextScreen": "Con una captura de {{name}}",
     "thinking": "Pensando…",
     "stopped": "Respuesta detenida.",
     "errorTitle": "No se pudo obtener respuesta",
@@ -440,6 +446,31 @@
         "done": "Ejecutado",
         "declined": "Rechazado",
         "failed": "No se pudo ejecutar"
+      }
+    },
+    "rdp": {
+      "intro": "Pregunta por lo que hay en el escritorio remoto: con «{{screen}}» marcado, la IA ve una captura junto a tu pregunta.",
+      "agentIntro": "Modo agente: pídele una tarea y la IA la hace en este servidor, con comandos por SSH y/o con el ratón y el teclado. Cada paso te pide permiso antes.",
+      "noReach": "Para que actúe en este servidor, deja que la IA use el ratón y el teclado, o enlaza un servidor SSH para los comandos en los ajustes del servidor.",
+      "commandsVia": "Los comandos van por SSH a través de «{{name}}»",
+      "desktopControl": "Dejar que la IA use el ratón y el teclado",
+      "desktopControlHint": "Ve una captura después de cada paso. Más lento que los comandos: para lo que solo se puede hacer desde la interfaz gráfica.",
+      "suggestions": {
+        "screen": "¿Qué hay en la pantalla?",
+        "error": "Explica el error de la pantalla y cómo arreglarlo",
+        "services": "¿Qué servicios de Windows no han arrancado?"
+      }
+    },
+    "desktop": {
+      "approve": "Hacerlo",
+      "invalid": "La IA envió una acción no válida; se le ha pedido que lo intente de nuevo.",
+      "screenAfter": "Pantalla después de este paso",
+      "state": {
+        "pending": "La IA quiere",
+        "running": "Actuando en el escritorio",
+        "done": "Hecho",
+        "declined": "Rechazado",
+        "failed": "No se pudo hacer"
       }
     }
   },

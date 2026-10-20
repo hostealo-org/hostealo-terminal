@@ -324,6 +324,7 @@ fn to_host(imported: &ImportedHost, into: Option<&str>) -> Host {
         color: imported.color.clone(),
         folder,
         rdp_shared_folder: None,
+        rdp_commands_host: None,
         has_password: false,
         has_passphrase: false,
         os: None,

@@ -88,6 +88,8 @@ export interface Host {
   folder: string | null;
   /** RDP only: local folder shared with the remote desktop as a drive. */
   rdpSharedFolder: string | null;
+  /** RDP only: the saved SSH host the AI agent runs commands through (same server, OpenSSH). */
+  rdpCommandsHost?: string | null;
   /** Set by the backend: a secret is stored in the OS keychain. */
   hasPassword: boolean;
   hasPassphrase: boolean;
@@ -481,9 +483,16 @@ export interface AiSettingsView {
   claudeCode: string | null;
 }
 
+/** A picture sent with a message (a remote desktop screenshot), base64 without the data: prefix. */
+export interface AiImage {
+  mediaType: "image/jpeg" | "image/png";
+  data: string;
+}
+
 export interface AiChatMessage {
   role: "user" | "assistant";
   content: string;
+  images?: AiImage[];
 }
 
 export type AiEvent =
@@ -500,11 +509,14 @@ export const aiSettingsSave = (settings: AiSettings, apiKey: SecretChange): Prom
 export const aiModels = (settings: AiSettings, apiKey?: string): Promise<string[]> =>
   invoke("ai_models", { settings, apiKey: apiKey || null });
 
-/** Starts a reply; events stream to `onEvent` until "done" or "error". Returns the request id. */
-export function aiChat(messages: AiChatMessage[], agent: boolean, onEvent: (event: AiEvent) => void): Promise<number> {
+/**
+ * Starts a reply; events stream to `onEvent` until "done" or "error". Returns the request id.
+ * `desktop`: the agent may also use the remote desktop's mouse and keyboard.
+ */
+export function aiChat(messages: AiChatMessage[], agent: boolean, desktop: boolean, onEvent: (event: AiEvent) => void): Promise<number> {
   const channel = new Channel<AiEvent>();
   channel.onmessage = onEvent;
-  return invoke("ai_chat", { messages, agent, onEvent: channel });
+  return invoke("ai_chat", { messages, agent, desktop, onEvent: channel });
 }
 
 /** What a command run by the agent printed (the end of it), and how it ended. */

@@ -16,8 +16,10 @@ import { useUi } from "../store/ui";
 import { HostTree } from "./HostTree";
 import { Logo } from "./Logo";
 import { Menu, type MenuAnchor } from "./ui/Menu";
+import packageJson from "../../package.json";
 
-const APP_VERSION = "0.1.0";
+// From package.json, which each release bumps along with tauri.conf.json.
+const APP_VERSION = packageJson.version;
 
 interface SidebarProps {
   onNewLocal: () => void;

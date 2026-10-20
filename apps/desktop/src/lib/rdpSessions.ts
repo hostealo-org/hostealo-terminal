@@ -1,8 +1,20 @@
 import { create } from "zustand";
 
+import type { AiImage, RdpInput } from "./ipc";
+
+/** A picture of the remote desktop, and how its pixels map to the desktop's. */
+export interface RdpScreenshot {
+  image: AiImage;
+  /** Size of the picture. */
+  width: number;
+  height: number;
+  /** Desktop pixels per picture pixel (1 when the picture was not scaled down). */
+  scale: number;
+}
+
 /**
- * Open remote desktop sessions by tab id, so controls outside the desktop (the tab bar) can act
- * on them without covering any part of the remote screen.
+ * Open remote desktop sessions by tab id, so controls outside the desktop (the tab bar, the AI
+ * assistant) can act on them without covering any part of the remote screen.
  */
 export interface RdpHandle {
   sendCtrlAltDel: () => void;
@@ -11,6 +23,10 @@ export interface RdpHandle {
   /** Touch screens: shows the device keyboard. Call it from the tap itself (see RdpKeyboard). */
   openKeyboard: () => void;
   closeKeyboard: () => void;
+  /** The desktop as it is on screen now, at most `maxEdge` pixels on its longer side. */
+  screenshot: (maxEdge: number) => RdpScreenshot | null;
+  /** Sends input as if the user did it (the AI agent, after approval). */
+  input: (ops: RdpInput[]) => void;
 }
 
 const sessions = new Map<string, RdpHandle>();

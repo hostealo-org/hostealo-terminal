@@ -10,7 +10,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 
@@ -110,7 +110,25 @@ fn prompt(messages: &[ChatMessage]) -> String {
     prompt
 }
 
-fn args(settings: &AiSettings, dir: &Path, prompt_file: &str) -> Vec<OsString> {
+/// What goes in on stdin: the prompt as text, or, when screenshots come along, one stream-json
+/// user message holding them and the prompt (the CLI's only way to take pictures without tools).
+fn stdin_payload(messages: &[ChatMessage]) -> (Vec<u8>, bool) {
+    let text = prompt(messages);
+    let images: Vec<Value> = messages
+        .iter()
+        .flat_map(|message| message.images())
+        .map(|image| image.anthropic_block())
+        .collect();
+    if images.is_empty() {
+        return (text.into_bytes(), false);
+    }
+    let mut content = images;
+    content.push(json!({"type": "text", "text": text}));
+    let line = json!({"type": "user", "message": {"role": "user", "content": content}});
+    (format!("{line}\n").into_bytes(), true)
+}
+
+fn args(settings: &AiSettings, dir: &Path, prompt_file: &str, json_input: bool) -> Vec<OsString> {
     let mut args: Vec<OsString> = [
         "-p",
         "--output-format",
@@ -125,6 +143,9 @@ fn args(settings: &AiSettings, dir: &Path, prompt_file: &str) -> Vec<OsString> {
     ]
     .map(OsString::from)
     .to_vec();
+    if json_input {
+        args.extend(["--input-format".into(), "stream-json".into()]);
+    }
     // In files, so no shell or batch-file quoting is involved.
     args.extend([
         "--system-prompt-file".into(),
@@ -168,8 +189,9 @@ pub async fn stream_chat(
 ) -> Result<(), String> {
     let claude = find(&settings.base_url).ok_or(NOT_INSTALLED)?;
     let (dir, prompt_file) = prepare_dir(system)?;
+    let (payload, json_input) = stdin_payload(messages);
     let mut child = Command::new(&claude)
-        .args(args(settings, &dir, &prompt_file))
+        .args(args(settings, &dir, &prompt_file, json_input))
         .current_dir(&dir)
         .env("PATH", child_path(&claude))
         .stdin(Stdio::piped())
@@ -182,7 +204,7 @@ pub async fn stream_chat(
 
     let mut stdin = child.stdin.take().ok_or("no stdin")?;
     stdin
-        .write_all(prompt(messages).as_bytes())
+        .write_all(&payload)
         .await
         .map_err(|e| e.to_string())?;
     drop(stdin);
@@ -244,7 +266,29 @@ mod tests {
         ChatMessage {
             role,
             content: content.into(),
+            images: Vec::new(),
         }
+    }
+
+    #[test]
+    fn screenshots_go_in_as_one_stream_json_message() {
+        let (payload, json_input) = stdin_payload(&[chat(Role::User, "hola")]);
+        assert!(!json_input);
+        assert_eq!(payload, b"hola");
+
+        let with_image = ChatMessage {
+            images: vec![super::super::ChatImage {
+                media_type: "image/jpeg".into(),
+                data: "QUJD".into(),
+            }],
+            ..chat(Role::User, "¿qué hay?")
+        };
+        let (payload, json_input) = stdin_payload(&[with_image]);
+        assert!(json_input);
+        let line: Value = serde_json::from_slice(&payload).unwrap();
+        assert_eq!(line["type"], "user");
+        assert_eq!(line["message"]["content"][0]["source"]["data"], "QUJD");
+        assert_eq!(line["message"]["content"][1]["text"], "¿qué hay?");
     }
 
     #[test]

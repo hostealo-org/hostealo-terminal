@@ -56,6 +56,9 @@ pub struct Host {
     /// RDP only: local folder shared with the remote desktop as a drive (`~` allowed).
     #[serde(default)]
     pub rdp_shared_folder: Option<String>,
+    /// RDP only: the saved SSH host (the same server, with OpenSSH) the AI agent runs commands on.
+    #[serde(default)]
+    pub rdp_commands_host: Option<String>,
     #[serde(default)]
     pub has_password: bool,
     #[serde(default)]
@@ -586,6 +589,7 @@ mod tests {
             color: None,
             folder: folder.map(String::from),
             rdp_shared_folder: None,
+            rdp_commands_host: None,
             has_password: false,
             has_passphrase: false,
             os: None,

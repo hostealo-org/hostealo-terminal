@@ -5,6 +5,7 @@ import { cn } from "@hostealo/ui/cn";
 
 import { isIOS, isMac } from "../lib/format";
 import { rdpClipboardSync, rdpClose, rdpConnect, rdpInput, rdpResize, type RdpClipboardNotice, type RdpInput } from "../lib/ipc";
+import { closeRdpCommands } from "../lib/rdpCommands";
 import { registerRdp, useRdpAudio } from "../lib/rdpSessions";
 import { createTouchGestures, useRdpKeyboard } from "../lib/rdpTouch";
 import { CTRL_ALT_DEL, SCANCODES } from "../lib/scancodes";
@@ -218,9 +219,27 @@ export function RdpView({ tab, active }: { tab: Tab; active: boolean }) {
           keyFieldRef.current?.blur();
           useRdpKeyboard.getState().setOpen(null);
         },
+        screenshot: (maxEdge) => {
+          const canvas = canvasRef.current;
+          if (!canvas || canvas.width === 0 || canvas.height === 0 || sessionRef.current === null) return null;
+          const scale = Math.max(1, Math.max(canvas.width, canvas.height) / maxEdge);
+          const shot = document.createElement("canvas");
+          shot.width = Math.round(canvas.width / scale);
+          shot.height = Math.round(canvas.height / scale);
+          const context = shot.getContext("2d");
+          if (!context) return null;
+          context.imageSmoothingQuality = "high";
+          context.drawImage(canvas, 0, 0, shot.width, shot.height);
+          const data = shot.toDataURL("image/jpeg", 0.85).replace(/^data:image\/jpeg;base64,/, "");
+          return { image: { mediaType: "image/jpeg", data }, width: shot.width, height: shot.height, scale: canvas.width / shot.width };
+        },
+        input: (ops) => sendRef.current(ops),
       }),
     [tab.id],
   );
+
+  // The AI agent's SSH connection for this desktop goes away with the tab.
+  useEffect(() => () => closeRdpCommands(tab.id), [tab.id]);
 
   // Stretch to fill when the shapes (almost) match; otherwise keep the shape.
   const fill =

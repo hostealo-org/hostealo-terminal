@@ -154,6 +154,9 @@
     "rdpHint": "Windows Remote Desktop (also xrdp). Use DOMAIN\\user for domain accounts. On a Mac, ⌘ works as Ctrl in the session.",
     "sharedFolder": "Shared folder",
     "sharedFolderHint": "Appears on the remote computer as the “Hostealo” drive (This PC), to copy files both ways. Leave empty to share nothing.",
+    "commandsHost": "AI agent commands over SSH",
+    "commandsHostNone": "None (mouse and keyboard only)",
+    "commandsHostHint": "A saved SSH host for this same server: the AI agent runs its commands there and reads their output, which is faster and more reliable than clicking. Windows Server 2019 and later include OpenSSH; to turn it on, run this in an administrator PowerShell on the server:",
     "sharedFolderNone": "Nothing shared",
     "showSecret": "Show",
     "hideSecret": "Hide",
@@ -366,6 +369,9 @@
     "noOutputHint": "This tab is not a terminal",
     "contextOutput": "With the output of {{name}}",
     "contextSession": "With the {{name}} session details",
+    "includeScreen": "{{name}} screen",
+    "includeScreenHint": "Sends a screenshot of the remote desktop with your question",
+    "contextScreen": "With a screenshot of {{name}}",
     "thinking": "Thinking…",
     "stopped": "Reply stopped.",
     "errorTitle": "Could not get a reply",
@@ -440,6 +446,31 @@
         "done": "Ran",
         "declined": "Declined",
         "failed": "Could not run"
+      }
+    },
+    "rdp": {
+      "intro": "Ask about what is on the remote desktop: with “{{screen}}” ticked, the AI sees a screenshot with your question.",
+      "agentIntro": "Agent mode: give it a task and the AI does it on this server, with commands over SSH and/or the mouse and keyboard. Every step asks for your permission first.",
+      "noReach": "To act on this server, let the AI use the mouse and keyboard, or link an SSH host for commands in the host settings.",
+      "commandsVia": "Commands run over SSH through “{{name}}”",
+      "desktopControl": "Let the AI use the mouse and keyboard",
+      "desktopControlHint": "It sees a screenshot after each step. Slower than commands: best for things only the graphical interface can do.",
+      "suggestions": {
+        "screen": "What is on the screen?",
+        "error": "Explain the error on the screen and how to fix it",
+        "services": "Which Windows services failed to start?"
+      }
+    },
+    "desktop": {
+      "approve": "Do it",
+      "invalid": "The AI sent an action that is not valid; it was told to try again.",
+      "screenAfter": "Screen after this step",
+      "state": {
+        "pending": "The AI wants to",
+        "running": "Acting on the desktop",
+        "done": "Done",
+        "declined": "Declined",
+        "failed": "Could not do it"
       }
     }
   },

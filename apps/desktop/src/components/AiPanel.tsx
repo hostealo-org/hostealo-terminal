@@ -8,12 +8,15 @@ import {
   CircleX,
   CornerDownLeft,
   LoaderCircle,
+  Monitor,
+  MousePointerClick,
   Paperclip,
   Play,
   RotateCcw,
   SlidersHorizontal,
   Sparkles,
   Square,
+  SquareTerminal,
   TextCursorInput,
   TriangleAlert,
   X,
@@ -21,10 +24,11 @@ import {
 import { cn } from "@hostealo/ui/cn";
 
 import { isDangerousCommand } from "../lib/danger";
+import { describeAction, isRiskyAction, parseAction, takeScreenshot } from "../lib/desktopAgent";
 import { isShellLanguage, parseInline, parseMarkdown } from "../lib/markdown";
 import { getTerminal } from "../lib/terminals";
-import type { Host } from "../lib/ipc";
-import { useAi, type AiMessage } from "../store/ai";
+import type { AiImage, Host } from "../lib/ipc";
+import { agentReach, useAi, type AiMessage } from "../store/ai";
 import { useHosts } from "../store/hosts";
 import { LOCAL_MONITOR, useMonitors } from "../store/monitor";
 import { isTerminalTab, useTabs, type Tab } from "../store/tabs";
@@ -56,8 +60,22 @@ const tail = (text: string, max: number) => (text.length > max ? `…${text.slic
 
 export function AiPanel() {
   const { t } = useTranslation();
-  const { settings, loadSettings, setOpen, includeOutput, setIncludeOutput, agentMode, setAgentMode, autoApprove, setAutoApprove, send, stop, clear } =
-    useAi();
+  const {
+    settings,
+    loadSettings,
+    setOpen,
+    includeOutput,
+    setIncludeOutput,
+    agentMode,
+    setAgentMode,
+    desktopControl,
+    setDesktopControl,
+    autoApprove,
+    setAutoApprove,
+    send,
+    stop,
+    clear,
+  } = useAi();
   const tabs = useTabs((s) => s.tabs);
   const activeId = useTabs((s) => s.activeId);
   const hosts = useHosts((s) => s.hosts);
@@ -75,7 +93,13 @@ export function AiPanel() {
   const busy = (conversation?.requestId ?? null) !== null || messages.some((m) => m.actionState === "running");
   const host = hosts.find((candidate) => candidate.id === tab?.hostId);
   const terminal = tab && isTerminalTab(tab) ? tab.id : null;
+  const rdp = tab?.kind === "rdp" ? tab.id : null;
   const sessionName = !tab || tab.kind === "local" ? t("tabs.local") : (host?.name ?? "");
+  // What the agent can do here: a terminal's commands, or on a remote desktop, SSH and/or the mouse.
+  const reach = agentReach(key, desktopControl);
+  const canAct = reach.run !== null || reach.desktop;
+  const commandsHostName = hosts.find((h) => h.id === reach.commandsHost)?.name;
+  const attachable = terminal !== null || rdp !== null;
 
   useEffect(() => {
     if (!settings) void loadSettings().catch(() => {});
@@ -111,9 +135,15 @@ export function AiPanel() {
       parts.push(`Recent terminal output (last ${CONTEXT_LINES} lines at most, oldest first):\n${tail(output, CONTEXT_CHARS)}`);
       label = t("ai.contextOutput", { name: sessionName });
     }
+    // On a remote desktop, the screen is the context.
+    const shot = rdp && includeOutput ? takeScreenshot(rdp) : null;
+    if (shot) {
+      parts.push(`A screenshot of the remote desktop is attached (${shot.width}×${shot.height} pixels).`);
+      label = t("ai.contextScreen", { name: sessionName });
+    }
     stickRef.current = true;
     setDraft("");
-    void send(key, text, { text: parts.join("\n\n"), label });
+    void send(key, text, { text: parts.join("\n\n"), label }, shot ? [shot.image] : undefined);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -125,7 +155,14 @@ export function AiPanel() {
 
   const suggestions = terminal
     ? [t("ai.suggestions.explain"), t("ai.suggestions.failed"), t("ai.suggestions.disk")]
-    : [t("ai.suggestions.howto"), t("ai.suggestions.firewall")];
+    : rdp
+      ? [t("ai.rdp.suggestions.screen"), t("ai.rdp.suggestions.error"), t("ai.rdp.suggestions.services")]
+      : [t("ai.suggestions.howto"), t("ai.suggestions.firewall")];
+  const intro = rdp
+    ? agentMode
+      ? t(canAct ? "ai.rdp.agentIntro" : "ai.rdp.noReach")
+      : t("ai.rdp.intro", { screen: t("ai.includeScreen", { name: sessionName }) })
+    : t(agentMode && terminal ? "ai.agent.intro" : "ai.intro");
 
   return (
     <aside className="v2-shell-main my-2 mr-2 flex w-[400px] shrink-0 flex-col overflow-hidden compact:fixed compact:inset-0 compact:z-30 compact:m-0 compact:w-auto compact:rounded-none compact:border-0 compact:pt-[env(safe-area-inset-top)] compact:pb-[env(safe-area-inset-bottom)]" aria-label={t("ai.title")}>
@@ -172,7 +209,7 @@ export function AiPanel() {
           </div>
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col justify-end gap-2">
-            <p className="mb-1 text-xs leading-relaxed text-fg-muted">{t(agentMode && terminal ? "ai.agent.intro" : "ai.intro")}</p>
+            <p className="mb-1 text-xs leading-relaxed text-fg-muted">{intro}</p>
             {suggestions.map((suggestion) => (
               <button
                 key={suggestion}
@@ -215,22 +252,22 @@ export function AiPanel() {
             <label
               className={cn(
                 "flex min-w-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-badge px-1.5 py-1 text-xs transition-colors",
-                includeOutput && terminal ? "text-fg-secondary" : "text-fg-muted",
-                !terminal && "cursor-default opacity-60",
+                includeOutput && attachable ? "text-fg-secondary" : "text-fg-muted",
+                !attachable && "cursor-default opacity-60",
               )}
-              title={terminal ? t("ai.includeOutputHint") : t("ai.noOutputHint")}
+              title={rdp ? t("ai.includeScreenHint") : terminal ? t("ai.includeOutputHint") : t("ai.noOutputHint")}
             >
               <input
                 type="checkbox"
                 className="accent-[var(--accent)]"
-                checked={includeOutput && !!terminal}
-                disabled={!terminal}
+                checked={includeOutput && attachable}
+                disabled={!attachable}
                 onChange={(e) => setIncludeOutput(e.target.checked)}
               />
-              <Paperclip className="size-3 shrink-0" />
-              <span className="truncate">{t("ai.includeOutput", { name: sessionName })}</span>
+              {rdp ? <Monitor className="size-3 shrink-0" /> : <Paperclip className="size-3 shrink-0" />}
+              <span className="truncate">{rdp ? t("ai.includeScreen", { name: sessionName }) : t("ai.includeOutput", { name: sessionName })}</span>
             </label>
-            {terminal && (
+            {(terminal || rdp) && (
               <button
                 type="button"
                 role="switch"
@@ -260,7 +297,22 @@ export function AiPanel() {
             )}
           </div>
         </div>
-        {agentMode && terminal && (
+        {agentMode && rdp && (
+          <>
+            <label className="mt-2 flex cursor-pointer items-center gap-1.5 px-1 text-xs text-fg-muted" title={t("ai.rdp.desktopControlHint")}>
+              <input type="checkbox" className="accent-[var(--accent)]" checked={desktopControl} onChange={(e) => setDesktopControl(e.target.checked)} />
+              <MousePointerClick className="size-3 shrink-0" />
+              {t("ai.rdp.desktopControl")}
+            </label>
+            {commandsHostName && (
+              <p className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-fg-muted">
+                <SquareTerminal className="size-3 shrink-0" />
+                {t("ai.rdp.commandsVia", { name: commandsHostName })}
+              </p>
+            )}
+          </>
+        )}
+        {agentMode && canAct && (
           <label className="mt-2 flex cursor-pointer items-center gap-1.5 px-1 text-xs text-fg-muted">
             <input type="checkbox" className="accent-[var(--accent)]" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} />
             {t("ai.agent.autoApprove")}
@@ -273,10 +325,15 @@ export function AiPanel() {
   );
 }
 
+const imageUrl = (image: AiImage) => `data:${image.mediaType};base64,${image.data}`;
+
 function UserMessage({ message }: { message: AiMessage }) {
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="max-w-[90%] whitespace-pre-wrap break-words rounded-card bg-accent-button px-3 py-2 text-sm text-white">{message.text}</div>
+      {message.images?.map((image, i) => (
+        <img key={i} src={imageUrl(image)} alt="" className="max-h-28 max-w-[60%] rounded-btn border border-border object-contain" />
+      ))}
       {message.contextLabel && (
         <span className="flex items-center gap-1 text-[11px] text-fg-muted" title={message.context}>
           <Paperclip className="size-3" />
@@ -305,8 +362,8 @@ function AssistantMessage({ message, terminal, onSettings }: { message: AiMessag
       {blocks.map((block, i) => {
         switch (block.type) {
           case "code":
-            // Commands for the agent show as their own card.
-            if (block.lang === "run") return null;
+            // Commands and desktop actions for the agent show as their own card.
+            if (block.lang === "run" || block.lang === "action") return null;
             return <CodeBlock key={i} lang={block.lang} code={block.code} complete={block.complete && !streaming} terminal={terminal} />;
           case "heading":
             return (
@@ -451,6 +508,69 @@ function CodeBlock({ lang, code, complete, terminal }: { lang: string; code: str
 
 /** A command the agent wants to run: approve or decline it, then see how it went. */
 function ActionCard({ conversation, action }: { conversation: string; action: AiMessage }) {
+  if (action.actionKind === "desktop") return <DesktopActionCard conversation={conversation} action={action} />;
+  return <CommandActionCard conversation={conversation} action={action} />;
+}
+
+/** A mouse or keyboard step on the remote desktop: approve or decline it, then see the screen. */
+function DesktopActionCard({ conversation, action }: { conversation: string; action: AiMessage }) {
+  const { t } = useTranslation();
+  const { approve, decline } = useAi();
+  const [open, setOpen] = useState(false);
+  const parsed = parseAction(action.text);
+  const risky = parsed !== null && isRiskyAction(parsed);
+  const state = action.actionState ?? "pending";
+
+  return (
+    <div className={cn("overflow-hidden rounded-card border bg-deep", risky && state === "pending" ? "border-red/50" : "border-border")}>
+      <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-[11px] font-medium text-fg-muted">
+        <MousePointerClick className="size-3.5 text-accent" />
+        {action.error === "limit" ? t("ai.agent.limit") : t(`ai.desktop.state.${state}`)}
+        {risky && state === "pending" && (
+          <span className="ml-auto flex items-center gap-1 text-red">
+            <TriangleAlert className="size-3" />
+            {t("ai.dangerous")}
+          </span>
+        )}
+      </div>
+      <pre className="whitespace-pre-wrap px-3 py-2.5 [overflow-wrap:anywhere] font-mono text-[12.5px] leading-relaxed text-fg">
+        <code>{parsed ? describeAction(parsed) : action.text}</code>
+      </pre>
+      {state === "pending" && (
+        <div className="flex justify-end gap-2 border-t border-border px-3 py-2">
+          <Button size="sm" onClick={() => decline(conversation, action.id)}>
+            {t("ai.agent.decline")}
+          </Button>
+          <Button size="sm" variant="primary" className={risky ? "bg-red hover:bg-red hover:opacity-90" : undefined} onClick={() => void approve(conversation, action.id)}>
+            <Play className="size-3.5" />
+            {t("ai.desktop.approve")}
+          </Button>
+        </div>
+      )}
+      {state === "running" && (
+        <p className="flex items-center gap-2 border-t border-border px-3 py-2 text-xs text-fg-muted">
+          <LoaderCircle className="size-3.5 animate-spin" />
+          {t("ai.desktop.state.running")}
+        </p>
+      )}
+      {state === "failed" && (
+        <p className="border-t border-border px-3 py-2 text-xs text-red">{action.error === "invalid" ? t("ai.desktop.invalid") : action.error}</p>
+      )}
+      {state === "done" && action.resultImage && (
+        <div className="border-t border-border">
+          <button type="button" onClick={() => setOpen(!open)} className="flex w-full cursor-pointer items-center gap-1.5 px-3 py-1.5 text-left text-xs text-fg-muted hover:text-fg">
+            <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
+            {t("ai.desktop.screenAfter")}
+          </button>
+          {open && <img src={imageUrl(action.resultImage)} alt="" className="block w-full border-t border-border" />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A command the agent wants to run: approve or decline it, then see how it went. */
+function CommandActionCard({ conversation, action }: { conversation: string; action: AiMessage }) {
   const { t } = useTranslation();
   const { approve, decline } = useAi();
   const [open, setOpen] = useState(false);

@@ -10,12 +10,16 @@ import { hostsRevealSecret, sshKeysList, type AuthMethod, type Host, type Protoc
 import { useResolvedTheme } from "../hooks/usePreferences";
 import { useHosts } from "../store/hosts";
 import { Button } from "./ui/Button";
+import { CopyButton } from "./ui/CopyButton";
 import { Field, Input, Segmented } from "./ui/Form";
 import { Modal } from "./ui/Modal";
 
 type AuthType = AuthMethod["type"];
 
 const DEFAULT_KEY = "~/.ssh/id_ed25519";
+/** Turns on Windows' own OpenSSH server (Windows Server 2019+, Windows 10/11); run as administrator. */
+const OPENSSH_SETUP =
+  "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0; Set-Service sshd -StartupType Automatic; Start-Service sshd";
 const DEFAULT_PORTS: Record<Protocol, number> = { ssh: 22, ftp: 21, ftps: 21, rdp: 3389 };
 
 interface HostDialogProps {
@@ -39,6 +43,8 @@ export function HostDialog({ host, defaultFolder, onClose, onSaved }: HostDialog
   const [port, setPort] = useState(String(host?.port ?? 22));
   const [username, setUsername] = useState(host?.username ?? "");
   const [sharedFolder, setSharedFolder] = useState(host ? (host.rdpSharedFolder ?? "") : "~/Downloads");
+  const [commandsHost, setCommandsHost] = useState(host?.rdpCommandsHost ?? "");
+  const sshHosts = useHosts((s) => s.hosts).filter((h) => h.protocol === "ssh" && h.id !== host?.id);
   const [folder, setFolder] = useState(host ? (host.folder ?? "") : (defaultFolder ?? ""));
   const [color, setColor] = useState<HostColorSetting>((host?.color as HostColorSetting | null) ?? DEFAULT_HOST_COLOR);
   const [authType, setAuthType] = useState<AuthType>(host?.auth.type ?? "password");
@@ -119,6 +125,7 @@ export function HostDialog({ host, defaultFolder, onClose, onSaved }: HostDialog
           color,
           folder: folder.trim() || null,
           rdpSharedFolder: protocol === "rdp" ? sharedFolder.trim() || null : (host?.rdpSharedFolder ?? null),
+          rdpCommandsHost: protocol === "rdp" ? commandsHost || null : (host?.rdpCommandsHost ?? null),
           hasPassword: false,
           hasPassphrase: false,
         },
@@ -236,6 +243,37 @@ export function HostDialog({ host, defaultFolder, onClose, onSaved }: HostDialog
                   <FolderOpen className="size-4" />
                 </Button>
               </div>
+            )}
+          </Field>
+        )}
+
+        {protocol === "rdp" && (
+          <Field
+            label={t("host.commandsHost")}
+            hint={
+              <>
+                {t("host.commandsHostHint")}
+                <span className="mt-1.5 flex items-start gap-2">
+                  <code className="min-w-0 flex-1 rounded-btn bg-deep px-2 py-1.5 font-mono text-[11.5px] break-all text-fg-secondary">{OPENSSH_SETUP}</code>
+                  <CopyButton text={OPENSSH_SETUP} label={t("ai.copy")} variant="ghost" />
+                </span>
+              </>
+            }
+          >
+            {(id) => (
+              <select
+                id={id}
+                value={commandsHost}
+                onChange={(e) => setCommandsHost(e.target.value)}
+                className="h-9 touch:h-11 w-full min-w-0 cursor-pointer rounded-btn border border-input-border bg-input px-2.5 text-sm text-fg shadow-sm outline-none focus:border-fg-muted focus:ring-4 focus:ring-ring"
+              >
+                <option value="">{t("host.commandsHostNone")}</option>
+                {sshHosts.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name} ({h.username}@{h.hostname})
+                  </option>
+                ))}
+              </select>
             )}
           </Field>
         )}

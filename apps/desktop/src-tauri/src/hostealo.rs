@@ -245,6 +245,7 @@ fn merge(data: &mut HostsData, servers: &[Server], result: &mut SyncResult) {
                     color: None,
                     folder: Some(folder.into()),
                     rdp_shared_folder: None,
+                    rdp_commands_host: None,
                     has_password: false,
                     has_passphrase: false,
                     os: None,
