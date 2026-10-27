@@ -20,6 +20,7 @@ import { useHostAccent } from "../hooks/useHostColor";
 import { useResolvedTheme } from "../hooks/usePreferences";
 import { useSettings } from "../store/settings";
 import { useTabs, type Tab } from "../store/tabs";
+import { TerminalTextSheet } from "./TerminalTextSheet";
 import { Menu, type MenuAnchor } from "./ui/Menu";
 
 const FONT_FAMILY = '"Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace';
@@ -59,6 +60,8 @@ export function TerminalView({ tab, active }: TerminalViewProps) {
   tRef.current = t;
   const tabRef = useRef(tab);
   tabRef.current = tab;
+  // Opens the terminal text window from the key handler, set up once with the terminal.
+  const openTextSheet = useRef(() => {});
 
   useEffect(() => {
     const container = containerRef.current!;
@@ -89,6 +92,10 @@ export function TerminalView({ tab, active }: TerminalViewProps) {
     term.attachCustomKeyEventHandler((e) => {
       if (e.type === "keydown" && isClipboardKey(e, "KeyC") && term.hasSelection()) {
         void navigator.clipboard.writeText(term.getSelection());
+        return false;
+      }
+      if (e.type === "keydown" && e.shiftKey && isClipboardKey(e, "KeyS")) {
+        openTextSheet.current();
         return false;
       }
       if (e.type === "keydown" && !isMac && isClipboardKey(e, "KeyV")) {
@@ -282,26 +289,54 @@ export function TerminalView({ tab, active }: TerminalViewProps) {
     };
   }, []);
 
-  // A drag in a program that takes the mouse selects nothing: say which key selects anyway.
-  const [selectHint, setSelectHint] = useState(false);
+  // A short message over the terminal ("Copied", which key selects...).
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef(0);
+  const showNotice = useRef((text: string) => {
+    setNotice(text);
+    window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 3500);
+  }).current;
+  useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
+
+  // The terminal's text in a window where the mouse selects it as in any document, whatever
+  // the program running does with the mouse (⌘⇧S, or the right-click menu).
+  const [textSheet, setTextSheet] = useState(false);
+  openTextSheet.current = () => setTextSheet(true);
+
+  // Mouse: a drag in a program that takes the mouse (Claude Code, vim...) selects nothing, so
+  // say how to select anyway; and what is selected is copied on release (a setting).
   useEffect(() => {
     const container = containerRef.current;
     if (!container || isIOS) return;
     let start: { x: number; y: number } | null = null;
-    let timer = 0;
+    let pressed = false;
+    let copied = "";
     const onDown = (e: MouseEvent) => {
       const term = termRef.current;
       const forced = isMac ? e.altKey : e.shiftKey;
+      pressed = e.button === 0;
       start = e.button === 0 && !forced && term && term.modes.mouseTrackingMode !== "none" ? { x: e.clientX, y: e.clientY } : null;
     };
     const onMove = (e: MouseEvent) => {
       if (!start || !(e.buttons & 1) || Math.hypot(e.clientX - start.x, e.clientY - start.y) < 8) return;
       start = null;
-      setSelectHint(true);
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => setSelectHint(false), 4000);
+      showNotice(tRef.current(isMac ? "terminalMenu.selectHintMac" : "terminalMenu.selectHint"));
     };
-    const onUp = () => (start = null);
+    const onUp = () => {
+      start = null;
+      if (!pressed) return;
+      pressed = false;
+      const term = termRef.current;
+      if (!term || !useSettings.getState().copyOnSelect || !term.hasSelection()) return;
+      const text = term.getSelection();
+      if (!text.trim() || text === copied) return;
+      copied = text;
+      void navigator.clipboard.writeText(text).then(() => showNotice(tRef.current("terminalMenu.copied")));
+    };
+    const selection = termRef.current?.onSelectionChange(() => {
+      if (!termRef.current?.hasSelection()) copied = "";
+    });
     container.addEventListener("mousedown", onDown, true);
     container.addEventListener("mousemove", onMove, true);
     window.addEventListener("mouseup", onUp);
@@ -309,15 +344,17 @@ export function TerminalView({ tab, active }: TerminalViewProps) {
       container.removeEventListener("mousedown", onDown, true);
       container.removeEventListener("mousemove", onMove, true);
       window.removeEventListener("mouseup", onUp);
-      window.clearTimeout(timer);
+      selection?.dispose();
     };
-  }, []);
+  }, [showNotice]);
 
   // Right click: copy, paste, select all, clear (on iPhone and iPad the key bar does this).
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const menuEntries = () => {
     const term = termRef.current!;
     return [
+      { label: t("terminalMenu.selectText"), hint: isMac ? "⇧⌘S" : "Ctrl+Shift+S", onSelect: () => setTextSheet(true) },
+      { separator: true as const },
       ...(term.hasSelection()
         ? [{ label: t("terminalMenu.copy"), hint: isMac ? "⌘C" : "Ctrl+Shift+C", onSelect: () => void navigator.clipboard.writeText(term.getSelection()) }]
         : []),
@@ -359,10 +396,19 @@ export function TerminalView({ tab, active }: TerminalViewProps) {
           setMenu({ x: e.clientX, y: e.clientY });
         }}
       />
-      {selectHint && (
-        <div role="status" className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-sm text-white shadow-lg">
-          {t(isMac ? "terminalMenu.selectHintMac" : "terminalMenu.selectHint")}
+      {notice && (
+        <div role="status" className="pointer-events-none absolute bottom-4 left-1/2 max-w-[90%] -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-center text-sm text-white shadow-lg">
+          {notice}
         </div>
+      )}
+      {textSheet && (
+        <TerminalTextSheet
+          tabId={tab.id}
+          onClose={() => {
+            setTextSheet(false);
+            termRef.current?.focus();
+          }}
+        />
       )}
       {menu && (
         <Menu
@@ -379,7 +425,7 @@ export function TerminalView({ tab, active }: TerminalViewProps) {
 }
 
 /** ⌘ + key on a Mac; Ctrl+Shift + key elsewhere, where Ctrl + key belongs to the shell. */
-function isClipboardKey(e: KeyboardEvent, code: "KeyC" | "KeyV") {
+function isClipboardKey(e: KeyboardEvent, code: "KeyC" | "KeyV" | "KeyS") {
   if (e.code !== code || e.altKey) return false;
   return isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && e.shiftKey && !e.metaKey;
 }

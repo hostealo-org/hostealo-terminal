@@ -118,7 +118,9 @@
     "screenReaderHint": "For VoiceOver and other screen readers: terminal output is read as it arrives.",
     "appLockIos": "Lock with Face ID",
     "appLockMac": "Lock with Touch ID",
-    "appLockHint": "Asks for Face ID, Touch ID or the device password when the app opens and when you come back after a minute."
+    "appLockHint": "Asks for Face ID, Touch ID or the device password when the app opens and when you come back after a minute.",
+    "copyOnSelect": "Copy on select",
+    "copyOnSelectHint": "What you select in the terminal is copied when you release the mouse."
   },
   "ssh": {
     "connecting": "Connecting to {{target}}…",
@@ -878,7 +880,11 @@
     "paste": "Paste",
     "selectAll": "Select all",
     "clear": "Clear screen",
-    "selectHintMac": "This program uses the mouse: hold ⌥ Option to select text",
-    "selectHint": "This program uses the mouse: hold Shift to select text"
+    "selectHintMac": "This program uses the mouse: right click → Select text (⇧⌘S), or hold ⌥ while dragging",
+    "selectHint": "This program uses the mouse: right click → Select text (Ctrl+Shift+S), or hold Shift while dragging",
+    "selectText": "Select text…",
+    "copied": "Copied",
+    "sheetHintMac": "Select with the mouse as in any document and copy with ⌘C, or copy everything.",
+    "sheetHint": "Select with the mouse as in any document and copy with Ctrl+C, or copy everything."
   }
 }

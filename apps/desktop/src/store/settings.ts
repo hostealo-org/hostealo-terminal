@@ -9,6 +9,8 @@ interface Settings {
   theme: ThemePreference;
   language: LanguagePreference;
   fontSize: number;
+  /** What is selected in the terminal goes to the clipboard on release (desktop). */
+  copyOnSelect: boolean;
   /** Highlight IPs, errors, dates... in plain terminal output. */
   highlightOutput: boolean;
   /** The terminal's screen reader mode (VoiceOver, NVDA...): output is read as it arrives. */
@@ -47,6 +49,7 @@ const DEFAULTS: Settings = {
   language: "system",
   fontSize: 13,
   highlightOutput: true,
+  copyOnSelect: true,
   screenReader: false,
   appLock: false,
   checkUpdates: true,

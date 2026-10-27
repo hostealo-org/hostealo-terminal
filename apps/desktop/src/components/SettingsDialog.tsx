@@ -16,7 +16,7 @@ const MAX_FONT = 24;
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const { theme, language, fontSize, highlightOutput, screenReader, appLock, alertsEnabled, alertsNotify, alertDisk, alertMemory, alertCpu, update } = useSettings();
+  const { theme, language, fontSize, highlightOutput, copyOnSelect, screenReader, appLock, alertsEnabled, alertsNotify, alertDisk, alertMemory, alertCpu, update } = useSettings();
   const [lockError, setLockError] = useState<string | null>(null);
   // Turning the lock on asks once first, so it is never set where it cannot be opened.
   const setAppLock = async (on: boolean) => {
@@ -75,6 +75,15 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           </Checkbox>
           <p className="pl-6 text-xs leading-relaxed text-fg-muted">{t("settings.highlightHint")}</p>
         </div>
+
+        {!isIOS && (
+          <div className="flex flex-col gap-1.5">
+            <Checkbox checked={copyOnSelect} onChange={(copyOnSelect) => update({ copyOnSelect })}>
+              <span className="font-medium text-fg">{t("settings.copyOnSelect")}</span>
+            </Checkbox>
+            <p className="pl-6 text-xs leading-relaxed text-fg-muted">{t("settings.copyOnSelectHint")}</p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1.5">
           <Checkbox checked={screenReader} onChange={(screenReader) => update({ screenReader })}>
