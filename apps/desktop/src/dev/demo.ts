@@ -288,6 +288,20 @@ fi
 `,
     };
   }
+  if (name === ".env") {
+    return {
+      encoding: "utf-8",
+      modified,
+      content: `APP_ENV=production
+APP_URL=https://tienda.example.com
+DB_HOST=tienda-db-1
+DB_DATABASE=tienda
+DB_USERNAME=tienda
+DB_PASSWORD=Xk29-demo-only
+REDIS_URL=redis://tienda-cache-1:6379
+`,
+    };
+  }
   if (name === "os-release") {
     return {
       encoding: "utf-8",

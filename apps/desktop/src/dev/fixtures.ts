@@ -200,6 +200,7 @@ export const KNOWN: KnownHostEntry[] = [
 export const SFTP: SftpEntry[] = [
   { name: "etc", path: "/root/etc", isDir: true, isSymlink: false, size: 4096, modified: 1760500000, permissions: 0o755, owner: "root" },
   { name: "www", path: "/root/www", isDir: true, isSymlink: true, size: 13, modified: 1760400000, permissions: 0o777, owner: "root" },
+  { name: ".env", path: "/root/.env", isDir: false, isSymlink: false, size: 214, modified: 1760490000, permissions: 0o600, owner: "root" },
   { name: ".bashrc", path: "/root/.bashrc", isDir: false, isSymlink: false, size: 3771, modified: 1750000000, permissions: 0o644, owner: "root" },
   { name: "backup-2026-10-14.tar.gz", path: "/root/backup-2026-10-14.tar.gz", isDir: false, isSymlink: false, size: 1.8 * 2 ** 30, modified: 1760480000, permissions: 0o600, owner: "root" },
   { name: "deploy.sh", path: "/root/deploy.sh", isDir: false, isSymlink: false, size: 2210, modified: 1760510000, permissions: 0o755, owner: "root" },

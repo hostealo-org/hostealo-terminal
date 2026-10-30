@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bot,
@@ -24,6 +24,7 @@ import { cn } from "@hostealo/ui/cn";
 import { isDangerousCommand } from "../lib/danger";
 import { isShellLanguage, parseInline, parseMarkdown } from "../lib/markdown";
 import { getEditor, useEditors } from "../lib/editors";
+import { mayHoldSecrets } from "../lib/fileSecrets";
 import { getTerminal } from "../lib/terminals";
 import type { Host } from "../lib/ipc";
 import { useAi, type AiMessage } from "../store/ai";
@@ -84,6 +85,10 @@ export function AiPanel() {
   const editor = useEditors((s) => (tab ? s.byTab[tab.id] : undefined));
   const fileName = editor?.path.split(/[\\/]/).pop() ?? "";
   const attachable = terminal !== null || editor !== undefined;
+  // A file that may hold passwords goes to the AI only when ticked for it, file by file.
+  const [secretsAllowed, setSecretsAllowed] = useState<string | null>(null);
+  const secretFile = useMemo(() => !!editor && mayHoldSecrets(editor.path, editor.text()), [editor]);
+  const fileIncluded = !!editor && (secretFile ? secretsAllowed === editor.path : includeOutput);
 
   useEffect(() => {
     if (!settings) void loadSettings().catch(() => {});
@@ -119,8 +124,9 @@ export function AiPanel() {
       parts.push(`Recent terminal output (last ${CONTEXT_LINES} lines at most, oldest first):\n${tail(output, CONTEXT_CHARS)}`);
       label = t("ai.contextOutput", { name: sessionName });
     }
-    if (editor && includeOutput) {
-      const content = editor.text();
+    const content = editor?.text() ?? "";
+    // Checked again on sending: the file may have been edited since it was opened.
+    if (editor && (mayHoldSecrets(editor.path, content) ? secretsAllowed === editor.path : includeOutput)) {
       const selection = editor.selection();
       parts.push(`File open in the editor: ${editor.path} (syntax: ${editor.language()}, ${content.split("\n").length} lines)`);
       if (selection) parts.push(`Selected lines ${selection.fromLine}-${selection.toLine}:\n${selection.text}`);
@@ -235,7 +241,7 @@ export function AiPanel() {
             <label
               className={cn(
                 "flex min-w-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-badge px-1.5 py-1 text-xs transition-colors",
-                includeOutput && attachable ? "text-fg-secondary" : "text-fg-muted",
+                (editor ? fileIncluded : includeOutput && attachable) ? "text-fg-secondary" : "text-fg-muted",
                 !attachable && "cursor-default opacity-60",
               )}
               title={editor ? t("ai.includeFileHint") : terminal ? t("ai.includeOutputHint") : t("ai.noOutputHint")}
@@ -243,9 +249,9 @@ export function AiPanel() {
               <input
                 type="checkbox"
                 className="accent-[var(--accent)]"
-                checked={includeOutput && attachable}
+                checked={editor ? fileIncluded : includeOutput && attachable}
                 disabled={!attachable}
-                onChange={(e) => setIncludeOutput(e.target.checked)}
+                onChange={(e) => (editor && secretFile ? setSecretsAllowed(e.target.checked ? editor.path : null) : setIncludeOutput(e.target.checked))}
               />
               {editor ? <FileCode className="size-3 shrink-0" /> : <Paperclip className="size-3 shrink-0" />}
               <span className="truncate">{editor ? fileName : t("ai.includeOutput", { name: sessionName })}</span>
@@ -280,6 +286,12 @@ export function AiPanel() {
             )}
           </div>
         </div>
+        {secretFile && (
+          <p className="mt-2 flex items-start gap-1.5 px-1 text-xs leading-relaxed text-amber">
+            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+            {t(fileIncluded ? "ai.secretsSent" : "ai.secretsHeld")}
+          </p>
+        )}
         {agentMode && terminal && (
           <label className="mt-2 flex cursor-pointer items-center gap-1.5 px-1 text-xs text-fg-muted">
             <input type="checkbox" className="accent-[var(--accent)]" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} />
